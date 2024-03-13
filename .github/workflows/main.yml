@@ -1,0 +1,169 @@
+name: Rapid7 InsightAppSec API workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  conditional_execution:
+    runs-on: ubuntu-latest
+    env:
+      applicationID: "a6dda79b-6525-4600-9047-4fec7b8e94ea" #Example - please change it
+      scanConfigID: "adca777e-dc15-4b13-b0b2-4c22abf73144"  #Example - please change it
+      scanType: "INCREMENTAL"  #Enum: "REGULAR" "VERIFICATION" "INCREMENTAL"
+      
+    steps:
+      - name: Install jq
+        run: sudo apt-get install jq
+
+
+      - name: Extract and check value of the auth API-Key
+        id: check_value_auth
+        run: |
+          result=$(curl -H "X-Api-Key: ${{ secrets.API_KEY }}" https://us.api.insight.rapid7.com/validate)
+          value_auth=$(echo $result | grep -oP '"message":"\K[^"]+')
+          if [ "$value_auth" == "Authorized" ]; then
+            echo "is_authorized=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_authorized=false" >> $GITHUB_OUTPUT
+          fi
+
+      
+      - name: Action for Authorized
+        if: steps.check_value_auth.outputs.is_authorized == 'true'
+        run: |
+          echo "Authorized. Making API request..."
+          response_applicationID=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/apps/${{ env.applicationID }}" \
+          -H "Accept: application/json" \
+          -H "X-Api-Key: ${{ secrets.API_KEY }}" )
+
+          app_id=$(echo $response_applicationID | jq -r '.id')
+          echo "Extracted Application ID: $app_id"
+
+
+      - name: Action for Not Authorized
+        if: steps.check_value_auth.outputs.is_authorized == 'false'
+        run: |
+          echo "Not Authorized. Skipping API request."
+
+
+      - name: Kick-off Scan
+        if: steps.check_value_auth.outputs.is_authorized == 'false'
+        run: |
+          echo "Scan kicked off..."
+          curl -H "Content-Type: application/json" \
+               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+               -X POST \
+               -d '{"scan_config": {"id": "${{ env.scanConfigID }}"}, "scan_type": "${{ env.scanType }}", "validation": {"parent_scan_id": ""}}' \
+               "https://us.api.insight.rapid7.com/ias/v1/scans"
+
+          # Wait 10 seconds before proceeding to the next step - provisioning...
+          echo "Waiting 10 seconds - giving time IAS to provision scan infrastructure"
+          sleep 10
+
+              
+      - name: Get ScanID of the last scan
+        if: steps.check_value_auth.outputs.is_authorized == 'false'
+        id: last_scan_data
+        run: |
+          echo "Get information about scans..."
+          response_scans=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/scans" \
+          -H "X-Api-Key: ${{ secrets.API_KEY }}" )
+
+          scanId=$(echo "$response_scans" | jq -r '.data[0].id')
+          echo "Extracted scan ID: $scanId"
+          echo "SCAN_ID=$scanId" >> $GITHUB_ENV
+
+          scanStatus=$(echo "$response_scans" | jq -r '.data[0].status')
+          echo "Extracted scan status: $scanStatus"
+          echo "SCAN_STATUS=$scanStatus" >> $GITHUB_ENV
+
+
+      - name: Poll for scan status
+        if: steps.check_value_auth.outputs.is_authorized == 'false'
+        id: poll_scan_status
+        run: |
+          currentStatus="$SCAN_STATUS"
+          
+          while [ "$currentStatus" != "COMPLETE" ]; do
+              currentScanStatusObject=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/scans/$SCAN_ID" \
+              -H "X-Api-Key: ${{ secrets.API_KEY }}" )
+                            
+              currentStatus=$(echo "$currentScanStatusObject" | jq -r '.status')
+              echo "Current status of the scan: $currentStatus"
+              
+              if [ "$currentStatus" = "COMPLETE" ]; then
+                  echo "Scan completed."
+                  echo "scanStatusLoop=COMPLETE" >> $GITHUB_ENV
+                  break
+              else
+                  # For all other statuses, do nothing and loop will continue after the sleep
+                  :
+              fi
+              
+              echo "Scan is running, waiting another 60 seconds..."
+              sleep 60
+          done
+
+         
+      - name: Generating a CSV and a PDF report
+        if: steps.check_value_auth.outputs.is_authorized == 'true'
+        run: |
+          echo "Generating a report..."
+          
+          response_generate_report_csv=$(curl -i -H "Content-Type: application/json" \
+               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+               -X POST \
+               -d '{ "app": { "id": "${{ env.applicationID }}" }, "name": "Miklos_Report_Github", "format": "CSV", "scan": { "id": "9509076b-5be7-41d0-9ab4-f9e84c7dab5f" }, "type": "VULN_SUMMARY" }' \
+               "https://us.api.insight.rapid7.com/ias/v1/reports")
+          
+          location_report_URL_CSV=$(echo "$response_generate_report_csv" | grep -Fi Location: | tr -d '\r' | cut -d ' ' -f2)
+          echo "Location URL: $location_report_URL_CSV"
+
+          reportID_CSV = $(echo "$location_report_URL_CSV" | sed 's|.*/reports/\(.*\)|\1|') >> $GITHUB_ENV
+
+          response_generate_report_pdf=$(curl -i -H "Content-Type: application/json" \
+               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+               -X POST \
+               -d '{ "app": { "id": "${{ env.applicationID }}" }, "name": "Miklos_Report_Github", "format": "PDF", "scan": { "id": "$SCAN_ID" }, "type": "VULN_SUMMARY" }' \
+               "https://us.api.insight.rapid7.com/ias/v1/reports")
+
+          location_report_URL_PDF=$(echo "$response_generate_report_pdf" | grep -Fi Location: | tr -d '\r' | cut -d ' ' -f2)
+          echo "Location URL: $location_report_URL_PDF"
+
+          
+          reportID_PDF = $(echo "$location_report_URL_PDF" | sed 's|.*/reports/\(.*\)|\1|') >> $GITHUB_ENV
+
+
+      - name: Pulling the generated CSV and PDF report
+        if: steps.check_value_auth.outputs.is_authorized == 'true'
+        run: |
+          echo "Pulling the generated report..."
+          
+          response_scans=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/reports/$reportID_CSV" \
+              -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: text/csv, application/json" )
+          
+          # Save the response to a file
+          echo "$response_scans" > vulnerability_report.csv
+          echo "$response_scans" > vulnerability_report.json
+          chmod +x vulnerability_report.csv
+          
+          echo "Report saved to vulnerability_report.csv"
+
+          response_scans=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/reports/$reportID_PDF" \
+              -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Accept: text/csv, application/json" )
+
+      - name: Upload CSV report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: vulnerability_report
+          path: vulnerability_report.csv
+
+
+
+        

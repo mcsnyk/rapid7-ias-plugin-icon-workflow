@@ -119,21 +119,11 @@ jobs:
                "https://us.api.insight.rapid7.com/ias/v1/reports")
           
           location_report_URL_CSV=$(echo "$response_generate_report_csv" | grep -Fi Location: | tr -d '\r' | cut -d ' ' -f2)
-          echo "Location URL: $location_report_URL_CSV"
+          echo "Location URL CSV: $location_report_URL_CSV"
 
           reportID_CSV = $(echo "$location_report_URL_CSV" | sed 's|.*/reports/\(.*\)|\1|') >> $GITHUB_ENV
 
-          response_generate_report_pdf=$(curl -i -H "Content-Type: application/json" \
-               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
-               -X POST \
-               -d '{ "app": { "id": "${{ env.applicationID }}" }, "name": "Miklos_Report_Github", "format": "PDF", "scan": { "id": "$SCAN_ID" }, "type": "VULN_SUMMARY" }' \
-               "https://us.api.insight.rapid7.com/ias/v1/reports")
 
-          location_report_URL_PDF=$(echo "$response_generate_report_pdf" | grep -Fi Location: | tr -d '\r' | cut -d ' ' -f2)
-          echo "Location URL: $location_report_URL_PDF"
-
-          
-          reportID_PDF = $(echo "$location_report_URL_PDF" | sed 's|.*/reports/\(.*\)|\1|') >> $GITHUB_ENV
 
 
       - name: Pulling the generated CSV and PDF report

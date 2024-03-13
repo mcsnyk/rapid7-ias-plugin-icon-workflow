@@ -9,8 +9,8 @@ jobs:
   conditional_execution:
     runs-on: ubuntu-latest
     env:
-      applicationID: "a6dda79b-6525-4600-9047-4fec7b8e94ea" #Example - please change it
-      scanConfigID: "adca777e-dc15-4b13-b0b2-4c22abf73144"  #Example - please change it
+      applicationID: "a6dda79b-6525-4600-9047-4fec7b8e94ea" #Example - please change it.
+      scanConfigID: "adca777e-dc15-4b13-b0b2-4c22abf73144"  #Example - please change it.
       scanType: "INCREMENTAL"  #Enum: "REGULAR" "VERIFICATION" "INCREMENTAL"
       
     steps:

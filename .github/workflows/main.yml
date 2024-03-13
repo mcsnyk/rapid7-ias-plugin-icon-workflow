@@ -154,14 +154,12 @@ jobs:
 
           sleep 30
           echo "Pulling the PDF file:"
-          curl -X GET "https://us.api.insight.rapid7.com/ias/v1/reports/$reportID_PDF" \
+          response_scans2=$(curl -X GET "https://us.api.insight.rapid7.com/ias/v1/reports/$reportID_PDF" \
               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
-              -H "Accept: application/pdf" \
-              -D headers.txt \
-              -o "vulnerability_report.pdf"
+              -H "Accept: application/pdf, application/json")
           
+          echo "$response_scans2" > vulnerability_report.pdf
           chmod +x vulnerability_report.pdf
-          cat headers.txt
           ls -ll
 
       - name: Upload CSV and PDF reports as artifacts

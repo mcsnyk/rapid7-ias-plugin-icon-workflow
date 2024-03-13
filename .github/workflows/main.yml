@@ -167,7 +167,7 @@ jobs:
           name: vulnerability_reports
           path: |
             vulnerability_report.csv
-            downloaded_report.pdf
+            vulnerability_report.pdf
 
 
         

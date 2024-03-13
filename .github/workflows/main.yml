@@ -161,6 +161,7 @@ jobs:
               -o "vulnerability_report.pdf"
           
           chmod +x vulnerability_report.pdf
+          cat headers.txt
           ls -ll
 
       - name: Upload CSV and PDF reports as artifacts

@@ -159,10 +159,8 @@ jobs:
               -H "Accept-Encoding: gzip, deflate, br" \
               -H "Accept: application/pdf, application/json" \
               -H "Accept: */*" \
-              -D headers.txt \
-              -o "vulnerability_report.pdf"
+              -D headers.txt
          
-          chmod +x vulnerability_report.pdf
           cat headers.txt
           ls -ll
 
@@ -172,7 +170,7 @@ jobs:
           name: vulnerability_reports
           path: |
             vulnerability_report.csv
-            vulnerability_report.pdf
+            # vulnerability_report.pdf
 
 
         

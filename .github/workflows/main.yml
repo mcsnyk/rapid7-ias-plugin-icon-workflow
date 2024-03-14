@@ -108,7 +108,7 @@ jobs:
 
          
       - name: Generating a CSV and a PDF report
-        if: steps.check_value_auth.outputs.is_authorized == 'true'
+        if: steps.check_value_auth.outputs.is_authorized == 'false'
         run: |
           echo "Generating a report..."
           
@@ -125,6 +125,7 @@ jobs:
 
           response_generate_report_pdf=$(curl -i -H "Content-Type: application/json" \
                -H "X-Api-Key: ${{ secrets.API_KEY }}" \
+               -H "Content-Type: application/json" \
                -X POST \
                -d '{ "app": { "id": "${{ env.applicationID }}" }, "name": "Miklos_Report_Github", "format": "PDF", "scan": { "id": "9509076b-5be7-41d0-9ab4-f9e84c7dab5f" }, "type": "VULN_SUMMARY" }' \
                "https://us.api.insight.rapid7.com/ias/v1/reports")

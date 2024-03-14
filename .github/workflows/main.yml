@@ -158,8 +158,7 @@ jobs:
               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
               -H "Accept-Encoding: gzip, deflate, br" \
               -H "Accept: application/pdf, application/json" \
-              -H "Accept: */*" \
-              -o vulnerability_report.pdf
+              -H "Accept: */*"
           
           ls -ll
 
@@ -169,7 +168,7 @@ jobs:
           name: vulnerability_reports
           path: |
             vulnerability_report.csv
-            vulnerability_report.pdf
+
 
 
         

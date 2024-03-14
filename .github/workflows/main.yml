@@ -158,6 +158,7 @@ jobs:
               -H "X-Api-Key: ${{ secrets.API_KEY }}" \
               -H "Accept-Encoding: gzip, deflate, br" \
               -H "Accept: application/pdf, application/json" \
+              -D headers.txt \
               -o "vulnerability_report.pdf"
          
           chmod +x vulnerability_report.pdf
